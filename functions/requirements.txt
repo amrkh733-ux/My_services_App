@@ -1,0 +1,10 @@
+# Firebase Core
+firebase-admin
+firebase-functions
+functions-framework
+
+# Data & AI (المكتبات التي أضفتها سابقاً)
+pandas
+numpy>
+scikit-learn
+openai
