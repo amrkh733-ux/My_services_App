@@ -17,9 +17,10 @@ class CustomerReviewsPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: navy,
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           "التقييمات",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: currentUser == null
@@ -55,10 +56,11 @@ class CustomerReviewsPage extends StatelessWidget {
                         docs[index].data() as Map<String, dynamic>;
 
                     String providerName = data["providerName"] ?? "مقدم الخدمة";
+                    // جلب اسم العميل من البيانات
+                    String customerName =
+                        data["customerName"] ?? "عميل غير معروف";
                     String reviewText = data["review"] ?? "";
                     int rating = data["rating"] ?? 0;
-
-                    // 🔴 الحقل الجديد
                     bool isAvailable = data["isAvailable"] ?? true;
 
                     return Card(
@@ -73,16 +75,31 @@ class CustomerReviewsPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // 1. اسم مزود الخدمة (الأكبر)
                             Text(
                               providerName,
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: navy),
                             ),
 
-                            // 🔴 هنا يظهر "محجوزة"
+                            // 2. اسم العميل (أصغر وتحت اسم المزود مباشرة)
+                            Text(
+                              "العميل: $customerName",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+
+                            const SizedBox(height: 4),
+
+                            // التنبيه إذا كانت محجوزة
                             if (!isAvailable)
                               const Padding(
-                                padding: EdgeInsets.only(top: 4),
+                                padding: EdgeInsets.only(bottom: 4),
                                 child: Text(
                                   "محجوزة",
                                   style: TextStyle(
@@ -93,8 +110,7 @@ class CustomerReviewsPage extends StatelessWidget {
                                 ),
                               ),
 
-                            const SizedBox(height: 5),
-
+                            // عرض النجوم
                             Row(
                               children: List.generate(
                                 5,
@@ -105,10 +121,16 @@ class CustomerReviewsPage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 5),
+
+                            const SizedBox(height: 8),
+
+                            // نص التقييم
                             Text(
                               reviewText,
-                              style: const TextStyle(fontSize: 14),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
                             ),
                           ],
                         ),

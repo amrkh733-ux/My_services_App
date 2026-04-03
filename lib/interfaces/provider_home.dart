@@ -1,6 +1,7 @@
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:cloudinary_public/cloudinary_public.dart';
+
 import '../messaging/provider_messaging_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -316,10 +317,11 @@ class _CreateAdPageState extends State<CreateAdPage> {
 
   // --- دالة إرسال الإعلان المحدثة (تم إصلاح الأقواس هنا) ---
   // --- دالة إرسال الإعلان (نسخة مشروع التخرج بدون رفع Storage) ---
+  // --- دالة إرسال الإعلان المحدثة لاستخدام Cloudinary (الحل المجاني والدائم) ---
+// --- دالة إرسال الإعلان المحدثة باستخدام Cloudinary ---
   Future<void> submitAd() async {
     final user = FirebaseAuth.instance.currentUser;
 
-    // 1. التحقق من الحقول لمنع ظهور خطأ Null
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("يرجى تسجيل الدخول أولاً")));
@@ -337,36 +339,61 @@ class _CreateAdPageState extends State<CreateAdPage> {
     }
 
     try {
-      // إظهار مؤشر تحميل بسيط
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+        builder: (context) => const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF0A2A43)),
+              SizedBox(height: 15),
+              Text(
+                "جاري رفع الصور لخدماتي...",
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
       );
 
-      // 2. بدلاً من الرفع (بسبب مشكلة الخطة)، سنأخذ المسارات المحلية فقط
-      // ملاحظة: هذه الروابط تعمل فقط على جهازك الحالي
-      List<String> localPaths = images.map((img) => img.path).toList();
+      // --- إعدادات Cloudinary الخاصة بحسابك (عمرو خالد) ---
+      final cloudinary = CloudinaryPublic(
+        'dlu9fxjc8', // الـ Cloud Name الخاص بك من الصورة
+        'my_preset', // اسم الـ Preset الذي أنشأته (تأكد أنه Unsigned)
+        cache: false,
+      );
 
-      // 3. إرسال البيانات إلى Firestore
+      List<String> uploadedImageUrls = [];
+
+      for (var image in images) {
+        CloudinaryResponse response = await cloudinary.uploadFile(
+          CloudinaryFile.fromFile(
+            image.path,
+            folder: 'khadamati_ads', // مجلد خاص بمشروع خدماتي
+          ),
+        );
+        uploadedImageUrls.add(response.secureUrl);
+      }
+
+      // حفظ البيانات في Firestore مع الروابط الحقيقية (https)
       await FirebaseFirestore.instance.collection("ads").add({
         "providerId": user.uid,
         "providerName": providerName,
         "profession": professionController.text.trim(),
         "experience": experienceController.text.trim(),
         "description": descriptionController.text.trim(),
-        "images": localPaths, // حفظ المسارات المحلية لتجنب الـ Null
+        "images": uploadedImageUrls,
         "status": "pending",
         "createdAt": FieldValue.serverTimestamp(),
       });
 
-      Navigator.pop(context); // إغلاق مؤشر التحميل
+      Navigator.pop(context); // إغلاق التحميل
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("تم ارسال الإعلان بنجاح ")),
+        const SnackBar(content: Text("تم رفع الإعلان بنجاح بنظام Cloudinary!")),
       );
 
-      // تنظيف الحقول والعودة
       experienceController.clear();
       descriptionController.clear();
       setState(() {
@@ -374,9 +401,11 @@ class _CreateAdPageState extends State<CreateAdPage> {
       });
       Navigator.pop(context);
     } catch (e) {
-      Navigator.pop(context); // إغلاق التحميل في حال الخطأ
+      Navigator.pop(context);
+      print("Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("حدث خطأ أثناء الحفظ: $e")),
+        SnackBar(
+            content: Text("فشل الرفع: تأكد من إعداد الـ Preset كـ Unsigned")),
       );
     }
   }

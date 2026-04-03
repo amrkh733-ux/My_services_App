@@ -19,13 +19,11 @@ class AccountControlPage extends StatelessWidget {
     return "client";
   }
 
-  /// 🔥 فتح رابط (PDF)
   Future<void> openLink(String url) async {
     final Uri uri = Uri.parse(url);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  /// 🔥 عرض السيفي داخل Dialog
   void showCV(BuildContext context, String url) {
     bool isImage =
         url.endsWith(".jpg") || url.endsWith(".png") || url.endsWith(".jpeg");
@@ -113,7 +111,6 @@ class AccountControlPage extends StatelessWidget {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      /// 👁️ عرض التفاصيل
                       IconButton(
                         icon: const Icon(Icons.visibility),
                         onPressed: () {
@@ -139,7 +136,6 @@ class AccountControlPage extends StatelessWidget {
                                   ),
                                 ),
                                 actions: [
-                                  /// 🔥 زر السيفي (فقط لمزود الخدمة)
                                   if (roleFixed == "provider" &&
                                       cvUrl != null &&
                                       cvUrl.isNotEmpty)
@@ -147,7 +143,6 @@ class AccountControlPage extends StatelessWidget {
                                       onPressed: () => showCV(context, cvUrl),
                                       child: const Text("عرض السيفي"),
                                     ),
-
                                   TextButton(
                                     child: const Text("إغلاق"),
                                     onPressed: () => Navigator.pop(context),
@@ -158,8 +153,6 @@ class AccountControlPage extends StatelessWidget {
                           );
                         },
                       ),
-
-                      /// ✏️ تعديل
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blue),
                         onPressed: () {
@@ -275,46 +268,6 @@ class AccountControlPage extends StatelessWidget {
                               );
                             },
                           );
-                        },
-                      ),
-
-                      /// 🚫 تعطيل / تفعيل
-                      /// 🗑️ حذف نهائي
-                      IconButton(
-                        icon: const Icon(Icons.delete_forever,
-                            color: Colors.black54),
-                        onPressed: () async {
-                          bool confirmed = await showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text("تأكيد الحذف النهائي"),
-                                  content: Text(
-                                      "هل أنت متأكد من حذف حساب (${data['name']}) وكل بياناته؟ لا يمكن التراجع عن هذه الخطوة."),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text("إلغاء"),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text("حذف الآن",
-                                          style: TextStyle(color: Colors.red)),
-                                    ),
-                                  ],
-                                ),
-                              ) ??
-                              false;
-
-                          if (confirmed) {
-                            await docs[index].reference.delete();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      "تم حذف الحساب وتطهير البيانات بنجاح 🗑️")),
-                            );
-                          }
                         },
                       ),
                       IconButton(
