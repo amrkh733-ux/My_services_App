@@ -80,8 +80,14 @@ class _CustomerHomeState extends State<CustomerHome> {
 
               var list = snapshot.data!;
 
+              // التحقق من القائمة بعد التصفية
               if (list.isEmpty) {
-                return const Center(child: Text("لا توجد بيانات"));
+                return const Center(
+                  child: Text(
+                    "لا يوجد مزودو خدمة متاحون حالياً",
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                );
               }
 
               return ListView.builder(
@@ -485,17 +491,22 @@ class _CustomerHomeState extends State<CustomerHome> {
                 ),
 
 // 🔥 الأكثر طلباً
+                // 🔥 الأكثر طلباً (تصفية لضمان ظهور المزودين فقط)
                 buildSection(
                   title: "الخدمات الأكثر طلباً",
-                  future: recommendationService.getMostRequestedProviders(),
+                  future: recommendationService.getAllProvidersSimple().then(
+                      (list) =>
+                          list.where((p) => p.profession.isNotEmpty).toList()),
                 ),
 
-// 🔥 الجميع
+// 🔥 الجميع (تصفية لضمان ظهور المزودين فقط)
                 buildSection(
                   title: "جميع مزودي الخدمة",
-                  future: recommendationService.getAllProvidersSimple(),
+                  future: recommendationService
+                      .getMostRequestedProviders()
+                      .then((list) =>
+                          list.where((p) => p.profession.isNotEmpty).toList()),
                 ),
-
                 const SizedBox(height: 20),
                 // 🔻 نفس الكود القديم (التصنيفات)
                 GridView.builder(
