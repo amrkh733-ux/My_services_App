@@ -492,19 +492,23 @@ class _CustomerHomeState extends State<CustomerHome> {
 
 // 🔥 الأكثر طلباً
                 // 🔥 الأكثر طلباً (تصفية لضمان ظهور المزودين فقط)
+                // 🔥 الخدمات الأكثر طلباً
                 buildSection(
                   title: "الخدمات الأكثر طلباً",
-                  future: recommendationService.getAllProvidersSimple().then(
-                      (list) =>
-                          list.where((p) => p.profession.isNotEmpty).toList()),
-                ),
-
-// 🔥 الجميع (تصفية لضمان ظهور المزودين فقط)
-                buildSection(
-                  title: "جميع مزودي الخدمة",
                   future: recommendationService
                       .getMostRequestedProviders()
-                      .then((list) =>
+                      .then(// التعديل هنا
+                          (list) => list
+                              .where((p) => p.profession.isNotEmpty)
+                              .toList()),
+                ),
+
+// 🔥 جميع مزودي الخدمة
+                buildSection(
+                  title: "جميع مزودي الخدمة",
+                  future: recommendationService.getAllProvidersSimple().then(
+                      // التعديل هنا
+                      (list) =>
                           list.where((p) => p.profession.isNotEmpty).toList()),
                 ),
                 const SizedBox(height: 20),
@@ -742,6 +746,7 @@ class ServicesPage extends StatelessWidget {
                                       ),
                                       onPressed: () {
                                         // استدعاء الديالوج مع تمرير providerId و providerName
+                                        // الجديد
                                         _showRatingDialog(
                                           context,
                                           serviceId,
@@ -749,7 +754,8 @@ class ServicesPage extends StatelessWidget {
                                           currentUser,
                                           providerName: data["providerName"] ??
                                               "غير معروف",
-                                          providerId: '',
+                                          providerId: data["providerId"] ??
+                                              "", // ✅ مرر المعرف الفعلي للمزود
                                         );
                                       },
                                     ),
