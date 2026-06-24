@@ -62,7 +62,6 @@ class ProviderHome extends StatelessWidget {
         ),
         actions: [
           // زر الإشعارات
-          // زر الإشعارات
           notificationIcon(context, "provider"),
           // قائمة الحساب والمزيد
           PopupMenuButton<int>(
@@ -71,6 +70,7 @@ class ProviderHome extends StatelessWidget {
               User? user = FirebaseAuth.instance.currentUser;
               if (user == null) return;
 
+              // جلب البيانات بشكل مباشر وتحديثها لضمان عدم تمرير حقول فارغة لتعديل البيانات
               DocumentSnapshot doc = await FirebaseFirestore.instance
                   .collection("users")
                   .doc(user.uid)
@@ -90,14 +90,15 @@ class ProviderHome extends StatelessWidget {
                   }
                   break;
 
-                case 1: // صفحتي
+                case 1: // صفحتي (تم التعديل هنا لضمان تمرير القيم المحدثة دائماً والمحمية)
                   if (data != null) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => ProfilePage(
                           name: data["name"] ?? "",
-                          role: data["role"] ?? "",
+                          role: data["role"] ??
+                              "provider", // إذا كانت فارغة نحددها كمزود خدمة تلقائياً
                           email: data["email"] ?? "",
                           phone: data["phone"] ?? "",
                           province: data["province"] ?? "",
@@ -315,10 +316,6 @@ class _CreateAdPageState extends State<CreateAdPage> {
     }
   }
 
-  // --- دالة إرسال الإعلان المحدثة (تم إصلاح الأقواس هنا) ---
-  // --- دالة إرسال الإعلان (نسخة مشروع التخرج بدون رفع Storage) ---
-  // --- دالة إرسال الإعلان المحدثة لاستخدام Cloudinary (الحل المجاني والدائم) ---
-// --- دالة إرسال الإعلان المحدثة باستخدام Cloudinary ---
   Future<void> submitAd() async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -357,10 +354,9 @@ class _CreateAdPageState extends State<CreateAdPage> {
         ),
       );
 
-      // --- إعدادات Cloudinary الخاصة بحسابك (عمرو خالد) ---
       final cloudinary = CloudinaryPublic(
-        'dlu9fxjc8', // الـ Cloud Name الخاص بك من الصورة
-        'my_preset', // اسم الـ Preset الذي أنشأته (تأكد أنه Unsigned)
+        'dlu9fxjc8',
+        'my_preset',
         cache: false,
       );
 
@@ -370,13 +366,12 @@ class _CreateAdPageState extends State<CreateAdPage> {
         CloudinaryResponse response = await cloudinary.uploadFile(
           CloudinaryFile.fromFile(
             image.path,
-            folder: 'khadamati_ads', // مجلد خاص بمشروع خدماتي
+            folder: 'khadamati_ads',
           ),
         );
         uploadedImageUrls.add(response.secureUrl);
       }
 
-      // حفظ البيانات في Firestore مع الروابط الحقيقية (https)
       await FirebaseFirestore.instance.collection("ads").add({
         "providerId": user.uid,
         "providerName": providerName,
@@ -388,7 +383,7 @@ class _CreateAdPageState extends State<CreateAdPage> {
         "createdAt": FieldValue.serverTimestamp(),
       });
 
-      Navigator.pop(context); // إغلاق التحميل
+      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("تم رفع الإعلان بنجاح بنظام Cloudinary!")),
@@ -410,7 +405,6 @@ class _CreateAdPageState extends State<CreateAdPage> {
     }
   }
 
-  // --- دالة الـ Build ---
   @override
   Widget build(BuildContext context) {
     const navy = Color(0xFF0A2A43);
@@ -470,9 +464,6 @@ class _CreateAdPageState extends State<CreateAdPage> {
               ),
             ),
             const SizedBox(height: 10),
-            // عرض الصور المختارة
-            // بعد رفع الصور إلى Firebase Storage
-// الكود الجديد لعرض الصور المختارة قبل إرسالها
             Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -488,13 +479,11 @@ class _CreateAdPageState extends State<CreateAdPage> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        // نستخدم kIsWeb لعرض الصورة بشكل صحيح حسب المنصة
                         child: kIsWeb
                             ? Image.network(img.path, fit: BoxFit.cover)
                             : Image.file(File(img.path), fit: BoxFit.cover),
                       ),
                     ),
-                    // زر صغير لحذف الصورة إذا تراجع المستخدم عن اختيارها
                     Positioned(
                       right: 0,
                       top: 0,
@@ -533,8 +522,7 @@ class _CreateAdPageState extends State<CreateAdPage> {
 }
 
 //////////////////////////////////////////////////////
-//////////////////////////////////////////////////////
-// صفحة الخدمات لكل قطاع (النسخة المعدلة بالكامل)
+// صفحة الخدمات لكل قطاع
 //////////////////////////////////////////////////////
 class ServiceCategoryPage extends StatefulWidget {
   final String categoryName;
@@ -558,7 +546,7 @@ class _ServiceCategoryPageState extends State<ServiceCategoryPage> {
   String selectedCurrency = "ريال يمني";
   final List<String> currencies = ["ريال يمني", "ريال سعودي", "دولار أمريكي"];
   String providerName = "";
-  bool isProcessing = false; // لمنع تكرار الإشعارات عند الضغط المتعدد
+  bool isProcessing = false;
 
   @override
   void initState() {
@@ -594,7 +582,7 @@ class _ServiceCategoryPageState extends State<ServiceCategoryPage> {
       "providerId": widget.userId,
       "providerName": providerName,
       "experience": experienceController.text.trim(),
-      "status": "متاح", // الحالة الافتراضية
+      "status": "متاح",
       "customerId": null,
       "bookedAt": null,
     });
@@ -614,7 +602,6 @@ class _ServiceCategoryPageState extends State<ServiceCategoryPage> {
       ),
       body: Column(
         children: [
-          // الجزء الخاص بإضافة خدمة جديدة
           Padding(
             padding: const EdgeInsets.all(10),
             child: Column(
@@ -673,8 +660,6 @@ class _ServiceCategoryPageState extends State<ServiceCategoryPage> {
             ),
           ),
           const Divider(thickness: 2),
-
-          // عرض قائمة الخدمات والطلبات
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -694,12 +679,10 @@ class _ServiceCategoryPageState extends State<ServiceCategoryPage> {
                   itemBuilder: (context, index) {
                     var data = docs[index].data() as Map<String, dynamic>;
 
-                    // 1. معالجة البيانات وتجنب الـ Null
                     String currentStatus = data["status"]?.toString() ?? "متاح";
                     String? customerId = data["customerId"]?.toString();
                     String serviceName = data["name"]?.toString() ?? "خدمة";
 
-                    // 2. شرط ظهور الأزرار (تظهر فقط عند "محجوز")
                     bool showActions =
                         (currentStatus == "محجوز" && customerId != null);
 
@@ -732,8 +715,6 @@ class _ServiceCategoryPageState extends State<ServiceCategoryPage> {
                             Text(
                                 "السعر: ${data["price"] ?? "0"} ${data["currency"] ?? ""}"),
                             const SizedBox(height: 5),
-
-                            // عرض الحالة بشكل ملون
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
@@ -757,8 +738,6 @@ class _ServiceCategoryPageState extends State<ServiceCategoryPage> {
                                 ),
                               ),
                             ),
-
-                            // 3. أزرار القبول والرفض (تظهر فقط عند الطلب الجديد)
                             if (showActions) ...[
                               const Divider(height: 25),
                               const Text("هناك طلب جديد بانتظار موافقتك:",
@@ -1053,7 +1032,3 @@ class ProfilePage extends StatelessWidget {
     );
   }
 }
-
-//////////////////////////////////////////////////////
-// صفحة محادثة الادمن
-//////////////////////////////////////////////////////

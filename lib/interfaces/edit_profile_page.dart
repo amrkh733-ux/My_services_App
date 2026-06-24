@@ -70,13 +70,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    // تم إزالة تحديث الـ role لحماية نوع الحساب من التغيير العشوائي
     await FirebaseFirestore.instance.collection("users").doc(user.uid).update({
       "name": nameController.text,
       "phone": phoneController.text,
       "email": emailController.text,
       "province": provinceController.text,
       "district": districtController.text,
-      "role": professionController.text, // يمكن التعديل إذا أردنا نوع الدور
       "profession": professionController.text,
       "age": ageController.text,
       "cvFile": cvController.text,
