@@ -30,85 +30,112 @@ class ProviderModel {
 class RecommendationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ✅ خفيف (بدون نجوم)
+  // ✅ خفيف (يجلب من لديهم مهنة فقط لضمان عدم ظهور الشاشة فارغة)
   Future<List<ProviderModel>> getAllProvidersSimple() async {
-    var snapshot = await _db.collection("users").get();
+    try {
+      var snapshot = await _db.collection("users").get();
 
-    return snapshot.docs.map((doc) {
-      var data = doc.data();
+      // 🔥 التصفية برمجياً: نأخذ فقط المستخدمين الذين لديهم حقل "مهنة"
+      var providersDocs = snapshot.docs.where((doc) {
+        var data = doc.data();
+        String prof = data['profession']?.toString().trim() ?? '';
+        return prof.isNotEmpty;
+      }).toList();
 
-      return ProviderModel(
-        id: doc.id,
-        name: data['name'] ?? 'بدون اسم',
-        category: data['category'] ?? 'عام',
-        profession: data['profession'] ?? '',
-      );
-    }).toList();
-  }
-
-  // ❗ ثقيل (يستخدم فقط عند الحاجة)
-  Future<List<ProviderModel>> getAllProvidersFull() async {
-    var snapshot = await _db.collection("users").get();
-    List<ProviderModel> providers = [];
-
-    for (var doc in snapshot.docs) {
-      var data = doc.data();
-
-      var provider = ProviderModel(
-        id: doc.id,
-        name: data['name'] ?? 'بدون اسم',
-        category: data['category'] ?? 'عام',
-        profession: data['profession'] ?? '',
-      );
-
-      // ⭐ التقييم
-      var reviews = await _db
-          .collection("reviews")
-          .where("providerId", isEqualTo: provider.id)
-          .get();
-
-      provider.reviewsCount = reviews.docs.length;
-
-      double total = 0;
-      for (var r in reviews.docs) {
-        total += (r['rating'] ?? 0);
-      }
-
-      provider.stars =
-          provider.reviewsCount > 0 ? total / provider.reviewsCount : 0;
-
-      // 📦 الطلبات
-      var orders = await _db
-          .collection("orders")
-          .where("providerId", isEqualTo: provider.id)
-          .get();
-
-      provider.ordersCount = orders.docs.length;
-
-      // 👥 العملاء
-      Set clients = {};
-      for (var o in orders.docs) {
-        clients.add(o['clientId']);
-      }
-
-      provider.clientsCount = clients.length;
-
-      providers.add(provider);
+      return providersDocs.map((doc) {
+        var data = doc.data();
+        return ProviderModel(
+          id: doc.id,
+          name: data['name'] ?? 'بدون اسم',
+          category: data['category'] ?? 'عام',
+          profession: data['profession'] ?? '',
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint("Error in getAllProvidersSimple: $e");
+      return [];
     }
-
-    return providers;
   }
 
-  // 🔥 الأفضل
+  // ⚡ ثقيل ومحسن (يجلب التقييمات والطلبات بشكل صحيح)
+  Future<List<ProviderModel>> getAllProvidersFull() async {
+    try {
+      var snapshot = await _db.collection("users").get();
+
+      // 🔥 التصفية برمجياً هنا أيضاً
+      var providersDocs = snapshot.docs.where((doc) {
+        var data = doc.data();
+        String prof = data['profession']?.toString().trim() ?? '';
+        return prof.isNotEmpty;
+      }).toList();
+
+      List<ProviderModel> providers = [];
+
+      for (var doc in providersDocs) {
+        var data = doc.data();
+
+        var provider = ProviderModel(
+          id: doc.id,
+          name: data['name'] ?? 'بدون اسم',
+          category: data['category'] ?? 'عام',
+          profession: data['profession'] ?? '',
+        );
+
+        // ⭐ جلب التقييمات وحساب النجوم
+        var reviews = await _db
+            .collection("reviews")
+            .where("providerId", isEqualTo: provider.id)
+            .get();
+
+        provider.reviewsCount = reviews.docs.length;
+
+        double total = 0;
+        for (var r in reviews.docs) {
+          total += (r['rating'] ?? 0.0).toDouble();
+        }
+
+        provider.stars =
+            provider.reviewsCount > 0 ? total / provider.reviewsCount : 0.0;
+
+        // 📦 جلب الطلبات
+        var orders = await _db
+            .collection("orders")
+            .where("providerId", isEqualTo: provider.id)
+            .get();
+
+        provider.ordersCount = orders.docs.length;
+
+        // 👥 حساب العملاء الفريدين
+        Set clients = {};
+        for (var o in orders.docs) {
+          clients.add(o['clientId']);
+        }
+        provider.clientsCount = clients.length;
+
+        providers.add(provider);
+      }
+
+      return providers;
+    } catch (e) {
+      debugPrint("Error in getAllProvidersFull: $e");
+      return [];
+    }
+  }
+
+  // 🔥 الأفضل (الترتيب الذكي الخالي من الأخطاء)
   Future<List<ProviderModel>> getTopProviders() async {
     var providers = await getAllProvidersFull();
 
+    // استبعاد من ليس لديهم تقييمات
     providers = providers.where((p) => p.reviewsCount > 0).toList();
 
+    // الترتيب الرياضي العادل لفرز الأفضل
     providers.sort((a, b) {
-      double scoreA = (a.stars * 2) + a.reviewsCount + (a.ordersCount * 0.5);
-      double scoreB = (b.stars * 2) + b.reviewsCount + (b.ordersCount * 0.5);
-      return scoreB.compareTo(scoreA);
+      double scoreA =
+          (a.stars * 3) + (a.reviewsCount * 1.5) + (a.ordersCount * 0.5);
+      double scoreB =
+          (b.stars * 3) + (b.reviewsCount * 1.5) + (b.ordersCount * 0.5);
+      return scoreB.compareTo(scoreA); // ترتيب تنازلي (الأعلى أولاً)
     });
 
     var top = providers.take(10).toList();
@@ -123,10 +150,9 @@ class RecommendationService {
   // 🔥 الأكثر طلباً
   Future<List<ProviderModel>> getMostRequestedProviders() async {
     var providers = await getAllProvidersFull();
-
+    // ترتيب تنازلي حسب عدد الطلبات
     providers.sort((a, b) => b.ordersCount.compareTo(a.ordersCount));
-
-    return providers;
+    return providers.take(10).toList();
   }
 }
 
@@ -136,17 +162,33 @@ class ProvidersListPage extends StatelessWidget {
 
   ProvidersListPage({super.key});
 
-  // ⭐ كرت فيه تفاصيل
+  // ⭐ كرت فيه تفاصيل للـ "أفضل" والـ "أكثر طلباً"
   Widget buildProviderCard(ProviderModel p) {
     return Card(
       margin: const EdgeInsets.all(8),
-      child: SizedBox(
-        width: 180,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.all(10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(p.profession),
+            const Icon(Icons.person, size: 40, color: Color(0xFF0A2A43)),
+            const SizedBox(height: 5),
+            Text(
+              p.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              p.profession.isNotEmpty ? p.profession : "مزود خدمة",
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 5),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -156,21 +198,29 @@ class ProvidersListPage extends StatelessWidget {
                     (i) => Icon(
                       i < p.stars.round() ? Icons.star : Icons.star_border,
                       color: Colors.amber,
-                      size: 16,
+                      size: 14,
                     ),
                   ),
                 ),
-                Text("${p.reviewsCount}"),
+                const SizedBox(width: 4),
+                Text(
+                  "(${p.reviewsCount})",
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
               ],
             ),
-            Text("📦 ${p.ordersCount} طلب"),
+            const SizedBox(height: 4),
+            Text(
+              "📦 ${p.ordersCount} طلب",
+              style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ✅ كرت بسيط بدون نجوم
+  // ✅ كرت بسيط لجميع مزودي الخدمة
   Widget buildSimpleCard(ProviderModel p) {
     return Container(
       width: 140,
@@ -183,19 +233,26 @@ class ProvidersListPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.person, size: 40),
+          const Icon(Icons.person, size: 40, color: Colors.grey),
           const SizedBox(height: 5),
-          Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
           Text(
-            p.profession,
+            p.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Text(
+            p.profession.isNotEmpty ? p.profession : "مقدم خدمة",
             style: const TextStyle(fontSize: 12, color: Colors.grey),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  // 🔥 قسم موحد
+  // 🔥 قسم موحد لعرض المجموعات المختلفة
   Widget buildSection({
     required String title,
     required Future<List<ProviderModel>> future,
@@ -205,14 +262,14 @@ class ProvidersListPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Text(
             title,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
         SizedBox(
-          height: 200,
+          height: 180,
           child: FutureBuilder<List<ProviderModel>>(
             future: future,
             builder: (context, snapshot) {
@@ -221,7 +278,12 @@ class ProvidersListPage extends StatelessWidget {
               }
 
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Text("لا يوجد بيانات"));
+                return const Center(
+                  child: Text(
+                    "لا يوجد بيانات حالياً",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                );
               }
 
               var providers = snapshot.data!;
@@ -245,22 +307,26 @@ class ProvidersListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("مزودي الخدمة")),
+      appBar: AppBar(
+        title: const Text("مزودي الخدمة"),
+        backgroundColor: const Color(0xFF0A2A43),
+      ),
       body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 10),
         children: [
-          // 🔥 الأفضل
+          // 🔥 أفضل مزودي الخدمة (مرتبين تنازلياً بأقوى نظام تقييم ذكي)
           buildSection(
-            title: "أفضل مزودي الخدمة",
+            title: "أفضل مزودي الخدمة (المقترحة لك)",
             future: recommendationService.getTopProviders(),
           ),
 
           // 🔥 الأكثر طلباً
           buildSection(
-            title: "الأكثر طلباً",
+            title: "الخدمات الأكثر طلباً",
             future: recommendationService.getMostRequestedProviders(),
           ),
 
-          // 🔥 الجميع (بدون نجوم ✔️)
+          // 🔥 الجميع (بدون حسابات ثقيلة)
           buildSection(
             title: "جميع مزودي الخدمة",
             future: recommendationService.getAllProvidersSimple(),
