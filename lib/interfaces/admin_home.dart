@@ -77,7 +77,6 @@ class _AdminHomeState extends State<AdminHome> {
 
   @override
   Widget build(BuildContext context) {
-    // باقي كود الـ build كما هو لديك تماماً
     User? user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
@@ -100,7 +99,6 @@ class _AdminHomeState extends State<AdminHome> {
           ),
         ),
         actions: [
-          // زر الإشعارات
           // زر الإشعارات المخصص للأدمن
           notificationIcon(context, "admin"),
           // قائمة الخيارات المنسدلة
@@ -161,9 +159,7 @@ class _AdminHomeState extends State<AdminHome> {
                   (route) => false,
                 );
               }
-              // فتح صفحة طلبات حذف الحساب
-
-// حذف حساب الأدمن نفسه
+              // حذف حساب الأدمن نفسه
               else if (value == 5 && user != null) {
                 bool confirmed = await showDialog(
                   context: context,
@@ -369,7 +365,7 @@ class AdminAdsApprovalPage extends StatelessWidget {
                                   targetUserId: "admin",
                                   title: "رسالة جديدة ✉️",
                                   message: messageController.text.trim(),
-                                  senderType: "customer", // أو "provider"
+                                  senderType: "customer",
                                   senderId:
                                       FirebaseAuth.instance.currentUser!.uid,
                                 );
@@ -474,7 +470,7 @@ class AdminCategoryServicesPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(categoryName),
-        backgroundColor: AdminHome.navy,
+        backgroundColor: AdminHome.navy ?? const Color(0xFF0A2A43),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -482,12 +478,14 @@ class AdminCategoryServicesPage extends StatelessWidget {
             .where("category", isEqualTo: categoryName)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           var docs = snapshot.data!.docs;
-          if (docs.isEmpty)
+          if (docs.isEmpty) {
             return const Center(child: Text("لا توجد خدمات حتى الآن"));
+          }
 
           return ListView.builder(
             itemCount: docs.length,
@@ -509,7 +507,7 @@ class AdminCategoryServicesPage extends StatelessWidget {
                               fontSize: 15, color: Colors.blueGrey)),
                       const SizedBox(height: 4),
                       Text("السعر: ${data["price"]}"),
-                      Text("العملة: ${data["currency"]}"),
+                      Text("العملة: ${data["currency"] ?? ""}"),
                       Text("سنوات الخبرة: ${data["experience"] ?? ""}"),
                       Text("الحالة: ${data["status"] ?? "متاح"}",
                           style: const TextStyle(
@@ -557,30 +555,35 @@ class AdminCategoryServicesPage extends StatelessWidget {
                                   ],
                                 ),
                                 actions: [
+                                  // زر الإلغاء تم إصلاحه ليغلق النافذة فقط
                                   TextButton(
                                     child: const Text("إلغاء"),
-                                    // زر الموافقة داخل AdminAdsApprovalPage
-                                    // داخل زر الموافقة في AdminAdsApprovalPage
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                    },
+                                  ),
+                                  // زر الحفظ الجديد لحفظ التعديلات في فايربيز بشكل صحيح
+                                  TextButton(
+                                    child: const Text("حفظ",
+                                        style: TextStyle(
+                                            color: Colors.blue,
+                                            fontWeight: FontWeight.bold)),
                                     onPressed: () async {
-                                      // 1. تحديث حالة الإعلان في Firebase
                                       await docs[index].reference.update({
-                                        "status": "approved",
+                                        "name": name.text.trim(),
+                                        "price": price.text.trim(),
+                                        "experience": experience.text.trim(),
                                       });
 
-                                      // 2. إرسال إشعار للمزود فوراً (باستخدام الدالة العالمية)
-                                      await sendNotification(
-                                        targetUserId: data["providerId"] ??
-                                            "", // معرف المزود
-                                        title: "تم قبول إعلانك 🎉",
-                                        message:
-                                            "وافق الأدمن على إعلانك (${data['profession']}) وهو متاح الآن للعملاء.",
-                                      );
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                "تمت الموافقة وإرسال إشعار للمزود")),
-                                      );
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  "تم تعديل الخدمة بنجاح")),
+                                        );
+                                      }
                                     },
                                   ),
                                 ],
@@ -607,9 +610,6 @@ class AdminCategoryServicesPage extends StatelessWidget {
 }
 
 //////////////////////////////////////////////////////
-// صفحة الإشعارات للادمن
-//////////////////////////////////////////////////////
-//////////////////////////////////////////////////////
 // صفحة طلبات حذف الحساب
 //////////////////////////////////////////////////////
 class DeletionRequestsPage extends StatelessWidget {
@@ -626,8 +626,9 @@ class DeletionRequestsPage extends StatelessWidget {
             .collection("deletion_requests")
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           return ListView(
             children: snapshot.data!.docs.map((doc) {
               return ListTile(
